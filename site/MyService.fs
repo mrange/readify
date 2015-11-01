@@ -22,6 +22,7 @@ module Data =
               [|
                 JsonString "123"
                 JsonString "456"
+                JsonString "789"
               |]
           |]
     }
