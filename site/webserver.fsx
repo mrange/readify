@@ -2,9 +2,9 @@
 // Start up Suave.io
 // --------------------------------------------------------------------------------------
 
+#r "FSharp.Compiler.Interactive.Settings"
 #r "../packages/Suave/lib/net40/Suave.dll"
 #r "../packages/M3.MiniJson/lib/net40-client/MiniJson.dll"
-#r "FSharp.Compiler.Interactive.Settings"
 
 #load "WebPartT.fs"
 #load "MyService.fs"

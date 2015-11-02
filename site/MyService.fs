@@ -1,102 +1,140 @@
 module MyService
 
-module Data =
-  open MiniJson.JsonModule
-
+module Compute =
   open System
+  open System.Text
 
-  type CustomerId = CustomerId  of int64
-  type OrderId    = OrderId     of int64
+  let Fibonacci n =
+    // Important: impl is tail-recursive
+    //  This allows F# to unwind impl into an effective for loop
+    let rec impl i f s=
+      if i < n then
+        let t = f + s
+        impl (i + 1L) s t
+      else
+        s
+    impl 0L 1L 1L
 
-  let ReadCustomer (CustomerId id) : Async<Json> =
-    async {
-      return
-        JsonObject
-          [|
-            "customerId"  , JsonString  (sprintf "%d" id)
-            "isActive"    , JsonBoolean true
-            "firstName"   , JsonString  "Mårten"
-            "lastName"    , JsonString  "Rånge"
-            "birthDate"   , JsonString  "1974"
-            "openOrders"  , JsonArray
-              [|
-                JsonString "123"
-                JsonString "456"
-                JsonString "789"
-              |]
-          |]
-    }
+  let Sort3 a b c =
+    let inline f a b c = if b <= c then a,b,c else a,c,b
 
-  let ReadOrder (CustomerId customerId) (OrderId orderId) : Async<Json> =
-    async {
-      return
-        JsonObject
-          [|
-            "orderId"     , JsonString  (sprintf "%d" orderId)
-            "customerId"  , JsonString  (sprintf "%d" customerId)
-            "isClosed"    , JsonBoolean false
-            "payDate"     , JsonString  "2015-10-01"
-          |]
-    }
+    if a <= b && a <= c then f a b c
+    elif b <= a && b <= c then f b a c
+    else f c a b
 
-  let SetOrderAsPaid (CustomerId customerId) (OrderId orderId) (date : DateTime) : Async<unit> =
-    async {
-      printfn "SetOrderAsPaid: %A, %A, %A" customerId orderId date
-      return ()
-    }
+  let (|Scalene|Isosceles|Equilateral|Error|) (a,b,c) =
+    let a,b,c = Sort3 a b c
+    if c < a + b then
+      match a = b, b = c with
+      | true  , true  -> Equilateral  // a = b && b = c => a = c
+      | false , false -> Scalene      // a,b,c sorted, a <> b && b <> c => a <> c
+      | _     , _     -> Isosceles    // All other cases => Isosceles
+    else
+      // c is greater or equal to sum of a b ==> no triangle
+      Error
+
+  let ReverseWords (input : string) =
+    let sb = StringBuilder input.Length
+
+    // Important: impl is tail-recursive
+    //  This allows F# to unwind impl into an effective for loop
+    let rec impl b i =
+      let inline reverse () = for ii = (i - 1) downto b do ignore <| sb.Append input.[ii]
+      if i < input.Length then
+        if not (Char.IsWhiteSpace input.[i]) then
+          impl b (i + 1)
+        else
+          reverse ()
+          ignore <| sb.Append input.[i]
+          impl (i + 1) (i + 1)
+      else
+        reverse ()
+
+    impl 0 0
+
+    sb.ToString ()
 
 module Parsers =
   open MiniJson.DynamicJsonModule
-  open System
 
-  let (|ParseId|_|) (jsonPath : JsonPath) =
-    if jsonPath.HasValue then
-      let r,v = Int64.TryParse jsonPath.AsString
-      if r then Some v
-      else None
-    else
-      None
-
-  let (|ParseDate|_|) (jsonPath : JsonPath) =
-    if jsonPath.HasValue then
-      let r,v = DateTime.TryParse jsonPath.AsString
-      if r then Some v
-      else None
-    else
-      None
+  let (|ParseString|_|) (p : JsonPath) =
+    if p.HasValue then Some p.AsString
+    else None
 
 module WebParts =
-  open Data
+  open Compute
+  open MiniJson.JsonModule
   open Parsers
+  open Suave.Http.RequestErrors
   open System
+  open System.Web
   open WebPartT
 
-  open MiniJson.JsonModule
+  let DoIndent = true
 
-  open Suave.Http.RequestErrors
+  let TokenJson =
+    JsonObject
+      [|
+        "token"   , JsonString "fc893331-82b8-41d4-b5cb-4582ad813cc9"
+      |]
 
-  let RespondWithJsonData (a : Async<Json>) =
-    FromAsync a
-      >>= RespondWithJson true
+  let JsonResponse json =
+    RespondWithJson DoIndent json
     |> ToWebPart
 
-  let GetCustomer customerId =
-    ReadCustomer (CustomerId customerId)
-    |> RespondWithJsonData
+  let GetToken =
+    TokenJson
+    |> JsonResponse
 
-  let GetOrderStatus (customerId,orderId) =
-    ReadOrder (CustomerId customerId) (OrderId orderId)
-    |> RespondWithJsonData
+  let GetFibonacciNumber n =
+    let f = Fibonacci n
+    JsonObject
+      [|
+        "input"     , JsonString (string n)
+        "fibonacci" , JsonString (string f)
+      |]
+    |> JsonResponse
 
-  let PostOrderStatus =
+  let GetShape (a,b,c) =
+    let s =
+      match a,b,c with
+      | Scalene     -> "Scalene"
+      | Isosceles   -> "Isosceles"
+      | Equilateral -> "Equilateral"
+      | Error       -> "Error"
+    JsonObject
+      [|
+        "a"         , JsonString (string a)
+        "b"         , JsonString (string b)
+        "c"         , JsonString (string c)
+        "shape"     , JsonString s
+      |]
+    |> JsonResponse
+
+  let GetReversedWords i =
+    let i = i |> HttpUtility.UrlDecode
+    let r = i |> ReverseWords
+    JsonObject
+      [|
+        "input"     , JsonString i
+        "reversed"  , JsonString r
+      |]
+    |> JsonResponse
+
+  let PostReversedWords =
     wpt {
-      let! _, q = ReceiveJson true
-      match q?customerId, q?orderId, q?paidDate with
-      | (ParseId customerId, ParseId orderId, ParseDate date) ->
-        do! FromAsync (SetOrderAsPaid (CustomerId customerId) (OrderId orderId) date)
-        return! RespondWithText "text/plain" "Successfully updated OrderStatus"
-      | _ ->
-        return! FailWith (BAD_REQUEST "Invalid OrderStatus data")
+      let! _,q = ReceiveJson true
+      match q?input with
+      | ParseString i ->
+        let r = i |> ReverseWords
+        let json =
+          JsonObject
+            [|
+              "input"     , JsonString i
+              "reversed"  , JsonString r
+            |]
+        return! RespondWithJson DoIndent json
+      | _ -> return! FailWith (BAD_REQUEST "Invalid input")
     } |> ToWebPart
 
 open Suave.Http
@@ -107,8 +145,10 @@ open Suave.Types
 let App : WebPart =
   choose
     [
-      GET   >>= pathScan  "/Customer/%u"        WebParts.GetCustomer
-      GET   >>= pathScan  "/OrderStatus/%u/%u"  WebParts.GetOrderStatus
-      POST  >>= path      "/OrderStatus"        >>= WebParts.PostOrderStatus
+      GET >>= path      "/WhatIsYourToken"          >>= WebParts.GetToken
+      GET >>= pathScan  "/FibonacciNumber/%u"           WebParts.GetFibonacciNumber
+      GET >>= pathScan  "/WhatShapeIsThis/%u/%u/%u"     WebParts.GetShape
+      GET >>= pathScan  "/ReverseWords/%s"              WebParts.GetReversedWords
+      POST>>= path      "/ReverseWords"             >>= WebParts.PostReversedWords
       NOT_FOUND "Invalid request"
     ]
