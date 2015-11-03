@@ -15,6 +15,8 @@
 // ----------------------------------------------------------------------------------------------
 module WebPartT
 
+[<NoEquality>]
+[<NoComparison>]
 type WebPartTResult<'T> =
   | SuccessfullyHandled of 'T*Suave.Types.HttpContext
   | FailedWhileHandling of Suave.Types.HttpContext

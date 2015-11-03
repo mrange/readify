@@ -5,11 +5,31 @@
 #r @"packages/FAKE/tools/FakeLib.dll"
 
 open Fake
+open Fake.FscHelper
 
+let SiteDir         = "./site/"
+let BuildDir        = "./build/"
+let WebServerFiles  = [SiteDir + "webserver.fsx"]
+let WebServerExe    = BuildDir + "webserver.exe"
 
-// --------------------------------------------------------------------------------------
-// Run all targets by default. Invoke 'build <Target>' to override
+Target "Clean" <| fun _ ->
+  CleanDirs [BuildDir]
+
+Target WebServerExe <| fun _ ->
+  WebServerFiles
+  |> Fsc (fun p ->
+    { p with  Output      = WebServerExe
+              FscTarget   = Exe
+              OtherParams = ["-O"; "-g"; "--standalone"]
+    })
+
+Target "Build" DoNothing
 
 Target "All" DoNothing
+
+"Clean"
+  ==> WebServerExe
+  ==> "Build"
+  ==> "All"
 
 RunTargetOrDefault "All"
