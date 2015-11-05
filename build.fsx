@@ -9,7 +9,7 @@ open Fake.FscHelper
 
 let SiteDir         = "./site/"
 let BuildDir        = "./build/"
-let WebServerFiles  = [SiteDir + "webserver.fsx"]
+let WebServerFiles  = [SiteDir + "900.webserver.fsx"]
 let WebServerExe    = BuildDir + "webserver.exe"
 
 Target "Clean" <| fun _ ->

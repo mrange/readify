@@ -25,8 +25,9 @@
 #r "../packages/Suave/lib/net40/Suave.dll"
 #r "../packages/M3.MiniJson/lib/net40-client/MiniJson.dll"
 
-#load "WebPartT.fs"
-#load "MyService.fs"
+#load "100.WebPartT.fs"
+#load "110.Tries.fs"
+#load "120.MyService.fs"
 
 open Suave
 open Suave.Http.Successful
