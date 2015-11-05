@@ -27,7 +27,8 @@
 
 #load "100.WebPartT.fs"
 #load "110.Tries.fs"
-#load "120.MyService.fs"
+#load "120.Html.fs"
+#load "200.MyService.fs"
 
 open Suave
 open Suave.Http.Successful

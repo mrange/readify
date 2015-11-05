@@ -76,6 +76,28 @@ module Parsers =
     if p.HasValue then Some p.AsString
     else None
 
+module Pages =
+  open Html
+
+  let PageServiceList =
+    page "Service list"
+      [
+        textHeader1 "Service list"
+
+        text "List of available services:"
+
+        unorderedList
+          [
+            [textLink "/WhatIsYourToken"            "WhatIsYourToken" ]
+            [textLink "/FibonacciNumber/3"          "FibonacciNumber" ]
+            [textLink "/WhatShapeIsThis/3/3/10"     "WhatShapeIsThis" ]
+            [textLink "/ReverseWords/Hello there!"  "ReverseWords"    ]
+          ]
+      ]
+
+  let HtmlServiceList = generateHtml PageServiceList
+
+
 module WebParts =
   open Compute
   open MiniJson.JsonModule
@@ -95,6 +117,10 @@ module WebParts =
 
   let JsonResponse json =
     RespondWithJson DoIndent json
+    |> ToWebPart
+
+  let GetServiceList =
+    RespondWithText "text/html" Pages.HtmlServiceList
     |> ToWebPart
 
   let GetToken =
@@ -165,5 +191,5 @@ let App : WebPart =
       GET >>= pathScan  "/WhatShapeIsThis/%u/%u/%u"     WebParts.GetShape
       GET >>= pathScan  "/ReverseWords/%s"              WebParts.GetReversedWords
       POST>>= path      "/ReverseWords"             >>= WebParts.PostReversedWords
-      NOT_FOUND "Invalid request"
+      WebParts.GetServiceList // Fallback
     ]
